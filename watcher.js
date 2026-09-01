@@ -72,12 +72,10 @@ async function checkDeviceStatus(firebaseUrl, apiKey, deviceId) {
 }
 
 // ═══ MAIN POLL FUNCTION ═══
-async function pollAll() {
+async function pollAll(specificWatchId = null) {
     const store = loadStore();
     const now = Date.now();
     let changed = false;
-
-    console.log(`[POLL] Scanning ${store.watches.length} watched device(s)...`);
 
     // Remove expired watches first
     const before = store.watches.length;
@@ -90,7 +88,13 @@ async function pollAll() {
     });
     if (store.watches.length !== before) changed = true;
 
-    for (const watch of store.watches) {
+    const targetWatches = specificWatchId 
+        ? store.watches.filter(w => w.id === specificWatchId)
+        : store.watches.filter(w => w.cronEnabled !== false);
+
+    console.log(`[POLL] Scanning ${targetWatches.length} watched device(s)...`);
+
+    for (const watch of targetWatches) {
         const db = store.databases.find(d => d.id === watch.databaseId);
         if (!db) {
             console.log(`[POLL] Database ${watch.databaseId} not found for watch ${watch.deviceId}, skipping`);

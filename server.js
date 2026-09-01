@@ -81,6 +81,7 @@ app.post('/api/watches', (req, res) => {
         deviceId: deviceId.trim().toLowerCase(),
         databaseId,
         note: note || '',
+        cronEnabled: true,
         createdAt: now,
         expiresAt,
         durationHours: durationHours || null,
@@ -104,6 +105,26 @@ app.put('/api/watches/:id/note', (req, res) => {
     watch.note = req.body.note || '';
     saveStore(store);
     res.json({ success: true });
+});
+
+// Toggle watch cron status
+app.put('/api/watches/:id/cron', (req, res) => {
+    const store = loadStore();
+    const watch = store.watches.find(w => w.id === req.params.id);
+    if (!watch) return res.status(404).json({ error: 'Watch not found' });
+    watch.cronEnabled = !!req.body.cronEnabled;
+    saveStore(store);
+    res.json({ success: true });
+});
+
+// Scan single watch manually
+app.post('/api/watches/:id/scan', async (req, res) => {
+    try {
+        await pollAll(req.params.id);
+        res.json({ success: true });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 // Delete watch

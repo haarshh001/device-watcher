@@ -47,16 +47,26 @@
     select.input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 
     /* Table */
-    .table-wrap { overflow-x: auto; }
-    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    th { text-align: left; padding: 12px 14px; color: var(--text3); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
-    td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+    .table-wrap { overflow-x: auto; background: var(--bg2); border-radius: var(--radius); border: 1px solid var(--border); }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; white-space: nowrap; }
+    th { text-align: left; padding: 16px 18px; background: rgba(0,0,0,0.2); color: var(--text3); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+    td { padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
     tr:hover td { background: rgba(255,255,255,0.02); }
-    .mono { font-family: var(--mono); font-size: 0.8rem; }
+    .mono { font-family: var(--mono); font-size: 0.85rem; }
+    .note-cell { max-width: 250px; white-space: normal; word-break: break-word; line-height: 1.4; color: var(--text2); }
+    
     .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
     .status-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
     .status-dot.off { background: var(--red); box-shadow: 0 0 8px var(--red); }
     .status-dot.unknown { background: var(--text3); }
+
+    /* Toggle Switch */
+    .toggle { position: relative; display: inline-block; width: 36px; height: 20px; vertical-align: middle; margin: 0; }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: var(--border); transition: .3s; border-radius: 20px; }
+    .slider:before { position: absolute; content: ""; height: 14px; width: 14px; left: 3px; bottom: 3px; background-color: var(--text2); transition: .3s; border-radius: 50%; }
+    input:checked + .slider { background-color: rgba(0,240,255,0.15); border: 1px solid rgba(0,240,255,0.3); }
+    input:checked + .slider:before { transform: translateX(16px); background-color: var(--cyan); box-shadow: 0 0 8px rgba(0,240,255,0.5); }
 
     /* Settings */
     .settings-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
@@ -147,9 +157,9 @@
                             <th>Database</th>
                             <th>Phone</th>
                             <th>Battery</th>
-                            <th>Duration</th>
+                            <th>Auto-Scan</th>
                             <th>Last Check</th>
-                            <th></th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody id="watchTable"></tbody>
@@ -304,17 +314,28 @@ function renderWatches() {
         const duration = w.durationHours ? `${w.durationHours}h` : '∞';
         const expires = w.expiresAt ? `<br><span style="font-size:0.7rem;color:var(--text3);">expires ${timeAgo(w.expiresAt, true)}</span>` : '';
         const safeNote = esc(w.note || '').replace(/'/g, "\\'");
+        const isCron = w.cronEnabled !== false; // defaults to true
 
         return `<tr>
             <td><span class="status-dot ${statusClass}"></span>${statusText}</td>
-            <td class="mono" style="color:var(--cyan)">${esc(w.deviceId)}</td>
-            <td>${esc(w.note || '-')} <span style="cursor:pointer;opacity:0.6;font-size:0.8rem;margin-left:4px;" onclick="editNote('${w.id}', '${safeNote}')" title="Edit Note">✏️</span></td>
+            <td class="mono" style="color:var(--cyan); cursor:pointer;" onclick="copyToClip('${esc(w.deviceId)}')">${esc(w.deviceId)}</td>
+            <td class="note-cell">${esc(w.note || '-')} <span style="cursor:pointer;opacity:0.6;font-size:0.8rem;margin-left:4px;" onclick="editNote('${w.id}', '${safeNote}')" title="Edit Note">✏️</span></td>
             <td>${db ? esc(db.label) : '<span style="color:var(--red)">Missing</span>'}</td>
             <td class="mono">${esc(w.phone || '-')}</td>
             <td>${esc(w.battery || '-')}</td>
-            <td>${duration}${expires}</td>
+            <td>
+                <label class="toggle" title="Toggle Auto-Scan (Cron)">
+                    <input type="checkbox" ${isCron ? 'checked' : ''} onchange="toggleCron('${w.id}', this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </td>
             <td style="color:var(--text3);font-size:0.8rem;">${lastCheck}</td>
-            <td><button class="btn btn-red btn-sm" onclick="deleteWatch('${w.id}')">✕</button></td>
+            <td>
+                <div style="display:flex; gap:6px;">
+                    <button class="btn btn-ghost btn-sm" onclick="scanSingle('${w.id}')" title="Scan Now" id="btn-scan-${w.id}">⚡</button>
+                    <button class="btn btn-red btn-sm" onclick="deleteWatch('${w.id}')" title="Remove">✕</button>
+                </div>
+            </td>
         </tr>`;
     }).join('');
 }
@@ -419,11 +440,35 @@ async function scanNow() {
     btn.innerHTML = '<div class="spinner"></div> Scanning...';
     try {
         await fetch('/api/scan-now', { method: 'POST' });
-        toast('Scan complete');
+        toast('Global scan complete');
         await load();
     } catch (e) { toast('Scan failed', true); }
     btn.disabled = false;
     btn.innerHTML = '⚡ Scan Now';
+}
+
+async function scanSingle(id) {
+    const btn = document.getElementById(`btn-scan-${id}`);
+    if(btn) btn.innerHTML = '<div class="spinner" style="width:12px;height:12px;border-width:2px;border-top-color:#fff"></div>';
+    try {
+        await fetch(`/api/watches/${id}/scan`, { method: 'POST' });
+        toast('Device scanned');
+        await load();
+    } catch (e) { toast('Scan failed', true); if(btn) btn.innerHTML = '⚡'; }
+}
+
+async function toggleCron(id, enabled) {
+    try {
+        await fetch(`/api/watches/${id}/cron`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cronEnabled: enabled })
+        });
+        toast(enabled ? 'Auto-scan enabled' : 'Auto-scan disabled');
+    } catch (e) { 
+        toast('Failed to toggle', true); 
+        load(); 
+    }
 }
 
 async function testTg() {
@@ -435,6 +480,11 @@ async function testTg() {
 }
 
 // ═══ HELPERS ═══
+function copyToClip(text) {
+    navigator.clipboard.writeText(text);
+    toast('Copied Device ID');
+}
+
 function esc(s) {
     if (!s) return '';
     const d = document.createElement('div');
