@@ -79,6 +79,16 @@
     /* Toast */
     .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg3); border: 1px solid var(--border); color: #fff; padding: 14px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 999; }
     .toast.show { transform: translateY(0); opacity: 1; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+        .header { flex-direction: column; align-items: flex-start; gap: 16px; }
+        .form-row { flex-direction: column; }
+        .input, select.input { max-width: 100% !important; width: 100%; }
+        .log-item { flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px 0; }
+        .log-time { min-width: auto; }
+        .log-item span[style*="margin-left:auto;"] { margin-left: 0 !important; }
+    }
 </style>
 </head>
 <body>
@@ -112,10 +122,11 @@
         <div class="card">
             <div class="form-row">
                 <input class="input" id="watchDeviceId" placeholder="Device ID (16-char hex)" />
-                <select class="input" id="watchDbSelect" style="max-width:200px">
+                <input class="input" id="watchNote" placeholder="Note (optional)" style="max-width:180px" />
+                <select class="input" id="watchDbSelect" style="max-width:180px">
                     <option value="">Select Database</option>
                 </select>
-                <select class="input" id="watchDuration" style="max-width:160px">
+                <select class="input" id="watchDuration" style="max-width:120px">
                     <option value="">Forever</option>
                     <option value="1">1 Hour</option>
                     <option value="6">6 Hours</option>
@@ -132,6 +143,7 @@
                         <tr>
                             <th>Status</th>
                             <th>Device ID</th>
+                            <th>Note</th>
                             <th>Database</th>
                             <th>Phone</th>
                             <th>Battery</th>
@@ -272,15 +284,31 @@ function renderWatches() {
 
     el.innerHTML = _data.watches.map(w => {
         const db = _data.databases.find(d => d.id === w.databaseId);
-        const statusClass = w.lastStatus === true ? 'on' : w.lastStatus === false ? 'off' : 'unknown';
-        const statusText = w.lastStatus === true ? 'Online' : w.lastStatus === false ? 'Offline' : 'Pending';
+        
+        let statusClass = 'unknown';
+        let statusText = 'Pending';
+        if (w.lastCheck) {
+            if (w.found === false) {
+                statusClass = 'unknown';
+                statusText = 'Not Found';
+            } else if (w.lastStatus === true) {
+                statusClass = 'on';
+                statusText = 'Online';
+            } else {
+                statusClass = 'off';
+                statusText = 'Offline';
+            }
+        }
+        
         const lastCheck = w.lastCheck ? timeAgo(w.lastCheck) : 'Never';
         const duration = w.durationHours ? `${w.durationHours}h` : '∞';
         const expires = w.expiresAt ? `<br><span style="font-size:0.7rem;color:var(--text3);">expires ${timeAgo(w.expiresAt, true)}</span>` : '';
+        const safeNote = esc(w.note || '').replace(/'/g, "\\'");
 
         return `<tr>
             <td><span class="status-dot ${statusClass}"></span>${statusText}</td>
             <td class="mono" style="color:var(--cyan)">${esc(w.deviceId)}</td>
+            <td>${esc(w.note || '-')} <span style="cursor:pointer;opacity:0.6;font-size:0.8rem;margin-left:4px;" onclick="editNote('${w.id}', '${safeNote}')" title="Edit Note">✏️</span></td>
             <td>${db ? esc(db.label) : '<span style="color:var(--red)">Missing</span>'}</td>
             <td class="mono">${esc(w.phone || '-')}</td>
             <td>${esc(w.battery || '-')}</td>
@@ -295,17 +323,19 @@ async function addWatch() {
     const deviceId = document.getElementById('watchDeviceId').value.trim();
     const databaseId = document.getElementById('watchDbSelect').value;
     const durationHours = document.getElementById('watchDuration').value || null;
+    const note = document.getElementById('watchNote').value.trim();
     if (!deviceId || !databaseId) return toast('Device ID and database are required', true);
 
     try {
         const r = await fetch('/api/watches', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ deviceId, databaseId, durationHours: durationHours ? parseInt(durationHours) : null })
+            body: JSON.stringify({ deviceId, databaseId, note, durationHours: durationHours ? parseInt(durationHours) : null })
         });
         const data = await r.json();
         if (data.success) {
             document.getElementById('watchDeviceId').value = '';
+            document.getElementById('watchNote').value = '';
             toast('Watch added — scanning now...');
             load();
             // Trigger an immediate scan
@@ -320,6 +350,21 @@ async function deleteWatch(id) {
         toast('Watch removed');
         load();
     } catch (e) { toast('Failed to remove', true); }
+}
+
+async function editNote(id, currentNote) {
+    const newNote = prompt("Enter note for this device (e.g. target name):", currentNote);
+    if (newNote === null) return; // User cancelled
+    
+    try {
+        await fetch(`/api/watches/${id}/note`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ note: newNote.trim() })
+        });
+        toast('Note updated');
+        load();
+    } catch (e) { toast('Failed to update note', true); }
 }
 
 // ═══ SETTINGS ═══

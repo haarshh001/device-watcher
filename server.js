@@ -60,7 +60,7 @@ app.delete('/api/databases/:id', (req, res) => {
 
 // Add watch
 app.post('/api/watches', (req, res) => {
-    const { deviceId, databaseId, durationHours } = req.body;
+    const { deviceId, databaseId, durationHours, note } = req.body;
     if (!deviceId || !databaseId) return res.status(400).json({ error: 'Device ID and database are required' });
 
     const store = loadStore();
@@ -80,6 +80,7 @@ app.post('/api/watches', (req, res) => {
         id,
         deviceId: deviceId.trim().toLowerCase(),
         databaseId,
+        note: note || '',
         createdAt: now,
         expiresAt,
         durationHours: durationHours || null,
@@ -93,6 +94,16 @@ app.post('/api/watches', (req, res) => {
     });
     saveStore(store);
     res.json({ success: true, id });
+});
+
+// Update watch note
+app.put('/api/watches/:id/note', (req, res) => {
+    const store = loadStore();
+    const watch = store.watches.find(w => w.id === req.params.id);
+    if (!watch) return res.status(404).json({ error: 'Watch not found' });
+    watch.note = req.body.note || '';
+    saveStore(store);
+    res.json({ success: true });
 });
 
 // Delete watch

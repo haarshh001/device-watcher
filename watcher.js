@@ -98,25 +98,28 @@ async function pollAll() {
         }
 
         const result = await checkDeviceStatus(db.url, db.apiKey, watch.deviceId);
-        const wasOffline = watch.lastStatus !== true;
+        const wasOnline = watch.lastStatus === true;
         const isNowOnline = result.online === true;
 
         // Update watch state
         watch.lastCheck = now;
         watch.lastStatus = result.online;
-        watch.battery = result.battery;
-        watch.ip = result.ip;
-        watch.model = result.model;
-        watch.phone = result.customPh;
+        watch.battery = result.battery || watch.battery; // Keep old battery if offline
+        watch.ip = result.ip || watch.ip;
+        watch.model = result.model || watch.model;
+        watch.phone = result.customPh || watch.phone;
         watch.found = result.found;
         changed = true;
 
-        // Send alert if device just came online
-        if (isNowOnline && wasOffline) {
-            const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const timeStr = new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const noteStr = watch.note ? `<b>Note:</b> ${watch.note}\n` : '';
+
+        // If it JUST came online
+        if (isNowOnline && !wasOnline) {
             const msg = `🟢 <b>DEVICE ONLINE ALERT</b>\n\n` +
                 `<b>Device:</b> <code>${watch.deviceId}</code>\n` +
                 `<b>Database:</b> ${db.label}\n` +
+                noteStr +
                 `<b>Phone:</b> ${result.customPh}\n` +
                 `<b>Battery:</b> ${result.battery}\n` +
                 `<b>IP:</b> ${result.ip}\n` +
@@ -125,7 +128,6 @@ async function pollAll() {
 
             const sent = await sendTelegram(msg);
 
-            // Log the notification
             store.logs.unshift({
                 type: 'online',
                 deviceId: watch.deviceId,
@@ -134,13 +136,37 @@ async function pollAll() {
                 time: now,
                 telegramSent: sent
             });
-
-            // Keep only last 100 logs
             if (store.logs.length > 100) store.logs = store.logs.slice(0, 100);
 
             console.log(`[POLL] 🟢 ${watch.deviceId} came ONLINE in ${db.label}!`);
+            
+        // If it JUST went offline (was online in the previous check)
+        } else if (!isNowOnline && wasOnline) {
+            const statusStr = result.found ? 'Offline' : 'Not Found (Deleted)';
+            const msg = `🔴 <b>DEVICE OFFLINE ALERT</b>\n\n` +
+                `<b>Device:</b> <code>${watch.deviceId}</code>\n` +
+                `<b>Database:</b> ${db.label}\n` +
+                noteStr +
+                `<b>Last Battery:</b> ${watch.battery || '-'}\n` +
+                `<b>Status:</b> ${statusStr}\n\n` +
+                `🕐 Detected at: ${timeStr}`;
+
+            const sent = await sendTelegram(msg);
+
+            store.logs.unshift({
+                type: 'offline',
+                deviceId: watch.deviceId,
+                database: db.label,
+                battery: watch.battery,
+                time: now,
+                telegramSent: sent
+            });
+            if (store.logs.length > 100) store.logs = store.logs.slice(0, 100);
+
+            console.log(`[POLL] 🔴 ${watch.deviceId} went OFFLINE in ${db.label} (Found: ${result.found})`);
+            
         } else if (!isNowOnline) {
-            console.log(`[POLL] 🔴 ${watch.deviceId} still offline in ${db.label}`);
+            console.log(`[POLL] 🔴 ${watch.deviceId} still offline in ${db.label} (Found: ${result.found})`);
         } else {
             console.log(`[POLL] 🟢 ${watch.deviceId} already online in ${db.label}`);
         }
