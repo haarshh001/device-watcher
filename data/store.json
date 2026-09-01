@@ -1,0 +1,40 @@
+{
+  "databases": [
+    {
+      "id": "db_1788264012175",
+      "url": "https://adsf-8b4e8-default-rtdb.asia-southeast1.firebasedatabase.app",
+      "apiKey": "",
+      "label": "ADSf"
+    }
+  ],
+  "watches": [
+    {
+      "id": "w_1788264029470",
+      "deviceId": "7dc3d1d93d88a426",
+      "databaseId": "db_1788264012175",
+      "createdAt": 1788264029470,
+      "expiresAt": 1788868829470,
+      "durationHours": 168,
+      "lastCheck": 1788264181526,
+      "lastStatus": false,
+      "battery": "83%",
+      "ip": "-",
+      "model": "-",
+      "phone": "-",
+      "found": true
+    }
+  ],
+  "settings": {
+    "intervalMinutes": 60
+  },
+  "logs": [
+    {
+      "type": "online",
+      "deviceId": "ec48b8b6d84f7b4f",
+      "database": "ADSf",
+      "battery": "40%",
+      "time": 1788264064139,
+      "telegramSent": true
+    }
+  ]
+}

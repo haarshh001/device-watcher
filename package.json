@@ -1,0 +1,16 @@
+{
+  "name": "device-watcher",
+  "version": "1.0.0",
+  "description": "Firebase device online status monitor with Telegram alerts",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "node-cron": "^3.0.3",
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1"
+  }
+}

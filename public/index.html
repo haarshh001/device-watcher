@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Device Watcher</title>
+<style>
+    :root {
+        --bg: #060913; --bg2: #0a101d; --bg3: #111827;
+        --border: #1f2937; --cyan: #00f0ff; --red: #ef4444;
+        --green: #22c55e; --amber: #f59e0b; --purple: #a855f7;
+        --text: #e5e7eb; --text2: #9ca3af; --text3: #6b7280;
+        --radius: 12px; --mono: 'SF Mono', 'Cascadia Code', 'Consolas', monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 32px 24px; }
+
+    /* Header */
+    .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; padding-bottom: 24px; border-bottom: 1px solid var(--border); }
+    .header h1 { font-size: 1.6rem; font-weight: 800; display: flex; align-items: center; gap: 12px; }
+    .header h1 span { color: var(--cyan); }
+    .header-actions { display: flex; gap: 10px; }
+
+    /* Buttons */
+    .btn { padding: 10px 18px; border-radius: 8px; font-weight: 700; font-size: 0.85rem; cursor: pointer; border: none; transition: all 0.2s; display: flex; align-items: center; gap: 8px; }
+    .btn-cyan { background: var(--cyan); color: #000; }
+    .btn-cyan:hover { box-shadow: 0 0 20px rgba(0,240,255,0.3); }
+    .btn-red { background: rgba(239,68,68,0.1); color: var(--red); border: 1px solid rgba(239,68,68,0.2); }
+    .btn-ghost { background: rgba(255,255,255,0.05); color: var(--text); border: 1px solid var(--border); }
+    .btn-green { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .btn-sm { padding: 6px 12px; font-size: 0.8rem; }
+    .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+    /* Cards */
+    .section { margin-bottom: 36px; }
+    .section-title { font-size: 1.1rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 10px; color: #fff; }
+    .section-title .badge { font-size: 0.75rem; background: rgba(0,240,255,0.1); color: var(--cyan); padding: 3px 10px; border-radius: 10px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; }
+
+    /* Forms */
+    .form-row { display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+    .input { background: var(--bg); border: 1px solid var(--border); color: #fff; padding: 10px 14px; border-radius: 8px; font-size: 0.9rem; outline: none; transition: 0.2s; flex: 1; min-width: 150px; }
+    .input:focus { border-color: var(--cyan); box-shadow: 0 0 12px rgba(0,240,255,0.15); }
+    .input::placeholder { color: var(--text3); }
+    select.input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239ca3af' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th { text-align: left; padding: 12px 14px; color: var(--text3); font-weight: 700; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 1px; border-bottom: 1px solid var(--border); }
+    td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,0.03); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    .mono { font-family: var(--mono); font-size: 0.8rem; }
+    .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+    .status-dot.on { background: var(--green); box-shadow: 0 0 8px var(--green); }
+    .status-dot.off { background: var(--red); box-shadow: 0 0 8px var(--red); }
+    .status-dot.unknown { background: var(--text3); }
+
+    /* Settings */
+    .settings-row { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .settings-row label { color: var(--text2); font-size: 0.9rem; font-weight: 600; }
+
+    /* Logs */
+    .log-item { display: flex; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,0.03); font-size: 0.85rem; }
+    .log-item:last-child { border-bottom: none; }
+    .log-time { color: var(--text3); font-family: var(--mono); font-size: 0.75rem; min-width: 160px; }
+    .log-device { color: var(--cyan); font-family: var(--mono); font-weight: 600; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 40px; color: var(--text3); font-size: 0.95rem; }
+
+    /* Spinner */
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner { width: 16px; height: 16px; border: 2px solid rgba(0,240,255,0.2); border-top-color: var(--cyan); border-radius: 50%; animation: spin 0.7s linear infinite; display: inline-block; }
+    .scanning-badge { display: inline-flex; align-items: center; gap: 6px; background: rgba(0,240,255,0.08); color: var(--cyan); padding: 4px 12px; border-radius: 8px; font-size: 0.75rem; font-weight: 700; }
+
+    /* Toast */
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg3); border: 1px solid var(--border); color: #fff; padding: 14px 20px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; box-shadow: 0 10px 30px rgba(0,0,0,0.5); transform: translateY(100px); opacity: 0; transition: all 0.3s; z-index: 999; }
+    .toast.show { transform: translateY(0); opacity: 1; }
+</style>
+</head>
+<body>
+<div class="container">
+    <!-- Header -->
+    <div class="header">
+        <h1>📡 <span>Device Watcher</span></h1>
+        <div class="header-actions">
+            <button class="btn btn-green btn-sm" onclick="testTg()">🔔 Test Telegram</button>
+            <button class="btn btn-cyan btn-sm" onclick="scanNow()" id="scanBtn">⚡ Scan Now</button>
+        </div>
+    </div>
+
+    <!-- Databases Section -->
+    <div class="section">
+        <div class="section-title">🗄️ Firebase Databases <span class="badge" id="dbCount">0</span></div>
+        <div class="card">
+            <div class="form-row">
+                <input class="input" id="dbUrl" placeholder="https://your-db-default-rtdb.firebaseio.com" />
+                <input class="input" id="dbKey" placeholder="API Key (optional)" style="max-width:200px" />
+                <input class="input" id="dbLabel" placeholder="Label" style="max-width:150px" />
+                <button class="btn btn-cyan btn-sm" onclick="addDb()">+ Add</button>
+            </div>
+            <div id="dbList"></div>
+        </div>
+    </div>
+
+    <!-- Watches Section -->
+    <div class="section">
+        <div class="section-title">👁️ Watched Devices <span class="badge" id="watchCount">0</span></div>
+        <div class="card">
+            <div class="form-row">
+                <input class="input" id="watchDeviceId" placeholder="Device ID (16-char hex)" />
+                <select class="input" id="watchDbSelect" style="max-width:200px">
+                    <option value="">Select Database</option>
+                </select>
+                <select class="input" id="watchDuration" style="max-width:160px">
+                    <option value="">Forever</option>
+                    <option value="1">1 Hour</option>
+                    <option value="6">6 Hours</option>
+                    <option value="12">12 Hours</option>
+                    <option value="24">24 Hours</option>
+                    <option value="48">48 Hours</option>
+                    <option value="168">1 Week</option>
+                </select>
+                <button class="btn btn-cyan btn-sm" onclick="addWatch()">+ Watch</button>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Device ID</th>
+                            <th>Database</th>
+                            <th>Phone</th>
+                            <th>Battery</th>
+                            <th>Duration</th>
+                            <th>Last Check</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="watchTable"></tbody>
+                </table>
+                <div id="watchEmpty" class="empty" style="display:none;">No devices being watched. Add one above.</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Section -->
+    <div class="section">
+        <div class="section-title">⚙️ Settings</div>
+        <div class="card">
+            <div class="settings-row">
+                <label>Poll every:</label>
+                <select class="input" id="intervalSelect" style="max-width:180px" onchange="updateInterval()">
+                    <option value="5">5 Minutes</option>
+                    <option value="15">15 Minutes</option>
+                    <option value="30">30 Minutes</option>
+                    <option value="60" selected>1 Hour</option>
+                    <option value="120">2 Hours</option>
+                </select>
+                <span id="nextPollInfo" style="color:var(--text3);font-size:0.8rem;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Section -->
+    <div class="section">
+        <div class="section-title">📜 Notification History <span class="badge" id="logCount">0</span></div>
+        <div class="card">
+            <div id="logList"></div>
+            <div id="logEmpty" class="empty" style="display:none;">No notifications yet. Watching for devices to come online...</div>
+        </div>
+    </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+let _data = { databases: [], watches: [], settings: { intervalMinutes: 60 }, logs: [] };
+
+// ═══ DATA ═══
+async function load() {
+    try {
+        const r = await fetch('/api/config');
+        _data = await r.json();
+        render();
+    } catch (e) { toast('Failed to load config', true); }
+}
+
+function render() {
+    renderDbs();
+    renderWatches();
+    renderLogs();
+    renderSettings();
+}
+
+// ═══ DATABASES ═══
+function renderDbs() {
+    const el = document.getElementById('dbList');
+    document.getElementById('dbCount').textContent = _data.databases.length;
+
+    // Update dropdown
+    const sel = document.getElementById('watchDbSelect');
+    const prev = sel.value;
+    sel.innerHTML = '<option value="">Select Database</option>' +
+        _data.databases.map(d => `<option value="${d.id}">${esc(d.label)}</option>`).join('');
+    sel.value = prev;
+
+    if (_data.databases.length === 0) {
+        el.innerHTML = '<div class="empty">No databases added yet.</div>';
+        return;
+    }
+    el.innerHTML = _data.databases.map(d => `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.03);">
+            <div>
+                <span style="font-weight:700;color:#fff;">${esc(d.label)}</span>
+                <span class="mono" style="color:var(--text3);margin-left:12px;">${esc(d.url)}</span>
+                ${d.apiKey ? '<span style="color:var(--amber);font-size:0.7rem;margin-left:8px;">🔑</span>' : ''}
+            </div>
+            <button class="btn btn-red btn-sm" onclick="deleteDb('${d.id}')">✕</button>
+        </div>
+    `).join('');
+}
+
+async function addDb() {
+    const url = document.getElementById('dbUrl').value.trim();
+    const apiKey = document.getElementById('dbKey').value.trim();
+    const label = document.getElementById('dbLabel').value.trim();
+    if (!url || !label) return toast('URL and label are required', true);
+
+    try {
+        const r = await fetch('/api/databases', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url, apiKey, label })
+        });
+        const data = await r.json();
+        if (data.success) {
+            document.getElementById('dbUrl').value = '';
+            document.getElementById('dbKey').value = '';
+            document.getElementById('dbLabel').value = '';
+            toast('Database added');
+            load();
+        } else { toast(data.error, true); }
+    } catch (e) { toast('Failed to add database', true); }
+}
+
+async function deleteDb(id) {
+    if (!confirm('Remove this database and all its watches?')) return;
+    try {
+        await fetch(`/api/databases/${id}`, { method: 'DELETE' });
+        toast('Database removed');
+        load();
+    } catch (e) { toast('Failed to remove', true); }
+}
+
+// ═══ WATCHES ═══
+function renderWatches() {
+    const el = document.getElementById('watchTable');
+    const empty = document.getElementById('watchEmpty');
+    document.getElementById('watchCount').textContent = _data.watches.length;
+
+    if (_data.watches.length === 0) {
+        el.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    el.innerHTML = _data.watches.map(w => {
+        const db = _data.databases.find(d => d.id === w.databaseId);
+        const statusClass = w.lastStatus === true ? 'on' : w.lastStatus === false ? 'off' : 'unknown';
+        const statusText = w.lastStatus === true ? 'Online' : w.lastStatus === false ? 'Offline' : 'Pending';
+        const lastCheck = w.lastCheck ? timeAgo(w.lastCheck) : 'Never';
+        const duration = w.durationHours ? `${w.durationHours}h` : '∞';
+        const expires = w.expiresAt ? `<br><span style="font-size:0.7rem;color:var(--text3);">expires ${timeAgo(w.expiresAt, true)}</span>` : '';
+
+        return `<tr>
+            <td><span class="status-dot ${statusClass}"></span>${statusText}</td>
+            <td class="mono" style="color:var(--cyan)">${esc(w.deviceId)}</td>
+            <td>${db ? esc(db.label) : '<span style="color:var(--red)">Missing</span>'}</td>
+            <td class="mono">${esc(w.phone || '-')}</td>
+            <td>${esc(w.battery || '-')}</td>
+            <td>${duration}${expires}</td>
+            <td style="color:var(--text3);font-size:0.8rem;">${lastCheck}</td>
+            <td><button class="btn btn-red btn-sm" onclick="deleteWatch('${w.id}')">✕</button></td>
+        </tr>`;
+    }).join('');
+}
+
+async function addWatch() {
+    const deviceId = document.getElementById('watchDeviceId').value.trim();
+    const databaseId = document.getElementById('watchDbSelect').value;
+    const durationHours = document.getElementById('watchDuration').value || null;
+    if (!deviceId || !databaseId) return toast('Device ID and database are required', true);
+
+    try {
+        const r = await fetch('/api/watches', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ deviceId, databaseId, durationHours: durationHours ? parseInt(durationHours) : null })
+        });
+        const data = await r.json();
+        if (data.success) {
+            document.getElementById('watchDeviceId').value = '';
+            toast('Watch added — scanning now...');
+            load();
+            // Trigger an immediate scan
+            setTimeout(() => scanNow(), 500);
+        } else { toast(data.error, true); }
+    } catch (e) { toast('Failed to add watch', true); }
+}
+
+async function deleteWatch(id) {
+    try {
+        await fetch(`/api/watches/${id}`, { method: 'DELETE' });
+        toast('Watch removed');
+        load();
+    } catch (e) { toast('Failed to remove', true); }
+}
+
+// ═══ SETTINGS ═══
+function renderSettings() {
+    document.getElementById('intervalSelect').value = _data.settings?.intervalMinutes || 60;
+}
+
+async function updateInterval() {
+    const mins = parseInt(document.getElementById('intervalSelect').value);
+    try {
+        await fetch('/api/settings', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ intervalMinutes: mins })
+        });
+        toast(`Polling interval set to ${mins} minutes`);
+    } catch (e) { toast('Failed to update', true); }
+}
+
+// ═══ LOGS ═══
+function renderLogs() {
+    const el = document.getElementById('logList');
+    const empty = document.getElementById('logEmpty');
+    const logs = _data.logs || [];
+    document.getElementById('logCount').textContent = logs.length;
+
+    if (logs.length === 0) {
+        el.innerHTML = '';
+        empty.style.display = 'block';
+        return;
+    }
+    empty.style.display = 'none';
+
+    el.innerHTML = logs.map(l => {
+        const time = new Date(l.time).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' });
+        const tgIcon = l.telegramSent ? '✅' : '❌';
+        return `<div class="log-item">
+            <span style="font-size:1.1rem;">🟢</span>
+            <span class="log-device">${esc(l.deviceId)}</span>
+            <span style="color:var(--text2);">came online in <strong>${esc(l.database)}</strong></span>
+            <span style="color:var(--text3);font-size:0.8rem;">${l.battery || ''}</span>
+            <span style="margin-left:auto;" title="Telegram ${l.telegramSent ? 'sent' : 'failed'}">${tgIcon}</span>
+            <span class="log-time">${time}</span>
+        </div>`;
+    }).join('');
+}
+
+// ═══ ACTIONS ═══
+async function scanNow() {
+    const btn = document.getElementById('scanBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<div class="spinner"></div> Scanning...';
+    try {
+        await fetch('/api/scan-now', { method: 'POST' });
+        toast('Scan complete');
+        await load();
+    } catch (e) { toast('Scan failed', true); }
+    btn.disabled = false;
+    btn.innerHTML = '⚡ Scan Now';
+}
+
+async function testTg() {
+    try {
+        const r = await fetch('/api/test-telegram', { method: 'POST' });
+        const data = await r.json();
+        toast(data.success ? 'Telegram test sent! Check your bot.' : 'Telegram failed — check your token/chat ID', !data.success);
+    } catch (e) { toast('Telegram test failed', true); }
+}
+
+// ═══ HELPERS ═══
+function esc(s) {
+    if (!s) return '';
+    const d = document.createElement('div');
+    d.textContent = String(s);
+    return d.innerHTML;
+}
+
+function timeAgo(ts, isFuture) {
+    const diff = isFuture ? (ts - Date.now()) : (Date.now() - ts);
+    const m = Math.floor(diff / 60000);
+    if (m < 1) return isFuture ? 'soon' : 'just now';
+    if (m < 60) return `${m}m ${isFuture ? 'left' : 'ago'}`;
+    const h = Math.floor(m / 60);
+    if (h < 24) return `${h}h ${isFuture ? 'left' : 'ago'}`;
+    const d = Math.floor(h / 24);
+    return `${d}d ${isFuture ? 'left' : 'ago'}`;
+}
+
+function toast(msg, isError) {
+    const el = document.getElementById('toast');
+    el.textContent = (isError ? '❌ ' : '✓ ') + msg;
+    el.style.borderColor = isError ? 'var(--red)' : 'var(--cyan)';
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// Auto-refresh every 30 seconds
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>
